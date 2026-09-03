@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resume Analyzer & Job Matcher</title>
+<style>
+  :root{
+    --bg:#0B0E17;
+    --line:#252B3B;
+    --text:#F1F3F9;
+    --muted:#8B93A7;
+    --violet:#8B5CF6;
+    --blue:#3B82F6;
+    --teal:#14B8A6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;overflow:hidden;
+    background:radial-gradient(circle at 75% 20%, #1B1440 0%, var(--bg) 55%);
+    color:var(--text);font-family:'Segoe UI', Arial, sans-serif;
+    display:flex;align-items:center;justify-content:center;padding:40px;
+    position:relative;
+  }
+  .stars{position:fixed;inset:0;pointer-events:none;}
+  .star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;opacity:.5;animation:twinkle 3s ease-in-out infinite;}
+  @keyframes twinkle{0%,100%{opacity:.15;}50%{opacity:.9;}}
+
+  .layout{width:100%;max-width:1100px;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;position:relative;z-index:1;}
+  @media (max-width:850px){ .layout{grid-template-columns:1fr;} .art{display:none;} }
+
+  .badge{
+    display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);
+    background:#161B29;border:1px solid var(--line);padding:6px 12px;border-radius:20px;margin-bottom:18px;
+    box-shadow:0 0 0 rgba(20,184,166,0); transition:.3s;
+  }
+  .badge:hover{box-shadow:0 0 14px rgba(20,184,166,.25); border-color:#14B8A6;}
+  .badge svg{width:14px;height:14px;}
+  h1{font-size:32px;line-height:1.15;margin:0 0 12px;font-weight:800;}
+  h1 span{background:linear-gradient(90deg,var(--violet),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--muted);font-size:15px;margin:0 0 32px;line-height:1.5;}
+
+  .drop{
+    position:relative;border:1.5px dashed var(--line);border-radius:16px;
+    background:#11162299;padding:38px 24px;text-align:center;cursor:pointer;
+    transition:.25s ease; overflow:hidden;
+  }
+  .drop::before{
+    content:'';position:absolute;inset:-2px;border-radius:16px;padding:2px;
+    background:linear-gradient(120deg,var(--violet),var(--blue),var(--teal),var(--violet));
+    background-size:300% 300%;
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    opacity:0; transition:opacity .3s ease;
+  }
+  .drop:hover::before, .drop.drag::before{opacity:1; animation:sheen 4s linear infinite;}
+  @keyframes sheen{0%{background-position:0% 50%;}100%{background-position:300% 50%;}}
+  .drop.drag{background:#1a1530;}
+  .drop-icon{
+    width:56px;height:56px;margin:0 auto 16px;border-radius:14px;
+    background:linear-gradient(135deg,var(--violet),var(--blue));display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 20px rgba(139,92,246,.35);
+  }
+  .drop-icon svg{width:26px;height:26px;stroke:white;}
+  .drop h3{margin:0 0 6px;font-size:17px;font-weight:700;}
+  .drop p{margin:0 0 20px;color:var(--muted);font-size:13.5px;}
+  .browse-btn{
+    background:white;color:#0B0E17;border:none;padding:10px 20px;border-radius:9px;
+    font-weight:700;font-size:14px;cursor:pointer;transition:.2s;
+  }
+  .browse-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(255,255,255,.15);}
+  .hint{font-size:12px;color:var(--muted);margin-top:14px;}
+  input[type=file]{display:none;}
+  .filename{margin-top:16px;font-size:13px;color:var(--teal);display:none;}
+
+  .next-btn{
+    width:100%;margin-top:24px;padding:13px;border:none;border-radius:10px;
+    background:var(--line);color:var(--muted);font-weight:700;font-size:15px;cursor:not-allowed;transition:.2s ease;
+  }
+  .next-btn.ready{background:linear-gradient(90deg,var(--violet),var(--blue));color:white;cursor:pointer;box-shadow:0 8px 24px rgba(59,130,246,.3);}
+  .next-btn.ready:hover{transform:translateY(-1px);}
+
+  .art{position:relative;display:flex;align-items:center;justify-content:center;height:440px;}
+  .glow{
+    position:absolute;bottom:20px;width:300px;height:130px;
+    background:radial-gradient(ellipse at center, rgba(139,92,246,.5), rgba(59,130,246,.18) 60%, transparent 75%);
+    filter:blur(10px);border-radius:50%;
+    animation:pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.08);opacity:.85;}}
+  .platform{
+    position:absolute;bottom:30px;width:230px;height:36px;border-radius:50%;
+    border:1px solid rgba(139,92,246,.55); box-shadow:0 0 30px rgba(139,92,246,.4);
+  }
+  .ring{
+    position:absolute;bottom:14px;width:290px;height:290px;border-radius:50%;
+    border:1px dashed rgba(59,130,246,.25);
+    animation:spin 18s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .doc{position:relative;z-index:2;width:200px;filter:drop-shadow(0 10px 30px rgba(59,130,246,.3));}
+  .float{position:absolute;animation:bob 3.5s ease-in-out infinite;}
+  .float.f2{animation-delay:.6s;} .float.f3{animation-delay:1.2s;} .float.f4{animation-delay:1.8s;} .float.f5{animation-delay:.9s;}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+
+  .circuits{position:absolute;inset:0;z-index:0;opacity:.55;}
+  .circuits path{stroke-dasharray:6 6; animation:dash 3s linear infinite;}
+  @keyframes dash{to{stroke-dashoffset:-24;}}
+  .node{fill:#3B4258;}
+  .node.pulse{animation:nodepulse 2.4s ease-in-out infinite;}
+  @keyframes nodepulse{0%,100%{opacity:.6;}50%{opacity:1;}}
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="layout">
+  <div class="form-col">
+    <div class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#14B8A6" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+      Your data is secure and used only for analysis
+    </div>
+
+    <h1>Resume <span>Analyzer</span> &<br><span>Job Matcher</span></h1>
+    <p class="sub">Analyze your resume, check ATS score, find matching jobs and improve your skills.</p>
+
+    <div class="drop" id="drop">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M20 16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3"/></svg>
+      </div>
+      <h3>Upload Your Resume</h3>
+      <p>Drag & drop your PDF here, or click to browse</p>
+      <button class="browse-btn" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+      <input type="file" id="fileInput" accept=".pdf">
+      <div class="hint">PDF only • up to 10MB</div>
+      <div class="filename" id="filename"></div>
+    </div>
+
+    <button class="next-btn" id="nextBtn" disabled>Next →</button>
+  </div>
+
+  <div class="art">
+    <svg class="circuits" viewBox="0 0 440 440" fill="none">
+      <path d="M220 60 L340 60 L340 140" stroke="#3B82F6" stroke-width="1.4"/>
+      <path d="M220 380 L110 380 L110 300" stroke="#8B5CF6" stroke-width="1.4"/>
+      <path d="M340 260 L400 260 L400 320" stroke="#14B8A6" stroke-width="1.4"/>
+      <path d="M60 180 L60 240 L120 240" stroke="#3B82F6" stroke-width="1.4"/>
+      <circle class="node pulse" cx="340" cy="140" r="4"/>
+      <circle class="node pulse" cx="110" cy="300" r="4"/>
+      <circle class="node pulse" cx="400" cy="320" r="4"/>
+      <circle class="node pulse" cx="120" cy="240" r="4"/>
+    </svg>
+
+    <div class="ring"></div>
+    <div class="glow"></div>
+    <div class="platform"></div>
+
+    <svg class="float f1" style="left:2%; top:8%;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="1.6"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-3 11c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a6 6 0 0 0-3-11z"/></svg>
+    <svg class="float f2" style="right:4%; top:4%;" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="1.6"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/></svg>
+    <svg class="float f3" style="left:0%; bottom:32%;" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+    <svg class="float f4" style="right:-2%; bottom:24%;" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.6"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+    <svg class="float f5" style="left:14%; top:0%;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="1.6"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/></svg>
+
+    <svg class="doc" viewBox="0 0 200 260" fill="none">
+      <rect x="10" y="10" width="180" height="240" rx="12" fill="#141A2A" stroke="#3B4258" stroke-width="1.5"/>
+      <circle cx="55" cy="55" r="18" fill="url(#g1)"/>
+      <rect x="85" y="42" width="80" height="7" rx="3" fill="#3B4258"/>
+      <rect x="85" y="58" width="55" height="6" rx="3" fill="#2A3247"/>
+      <rect x="30" y="95" width="140" height="6" rx="3" fill="#2A3247"/>
+      <rect x="30" y="112" width="140" height="6" rx="3" fill="#2A3247"/>
+      <rect x="30" y="129" width="90" height="6" rx="3" fill="#2A3247"/>
+      <rect x="30" y="155" width="60" height="14" rx="4" fill="url(#g2)"/>
+      <rect x="100" y="158" width="70" height="7" rx="3" fill="#2A3247"/>
+      <rect x="30" y="182" width="140" height="6" rx="3" fill="#2A3247"/>
+      <rect x="30" y="199" width="110" height="6" rx="3" fill="#2A3247"/>
+      <rect x="30" y="220" width="50" height="14" rx="7" fill="#14B8A6" opacity=".85"/>
+      <rect x="90" y="220" width="50" height="14" rx="7" fill="#3B82F6" opacity=".7"/>
+      <defs>
+        <linearGradient id="g1" x1="37" y1="37" x2="73" y2="73"><stop stop-color="#8B5CF6"/><stop offset="1" stop-color="#3B82F6"/></linearGradient>
+        <linearGradient id="g2" x1="30" y1="155" x2="90" y2="169"><stop stop-color="#8B5CF6"/><stop offset="1" stop-color="#3B82F6"/></linearGradient>
+      </defs>
+    </svg>
+  </div>
+</div>
+
+<script>
+  const starsWrap = document.getElementById('stars');
+  for(let i=0;i<50;i++){
+    const s = document.createElement('div');
+    s.className='star';
+    s.style.left = Math.random()*100+'%';
+    s.style.top = Math.random()*100+'%';
+    s.style.animationDelay = (Math.random()*3)+'s';
+    starsWrap.appendChild(s);
+  }
+
+  const drop = document.getElementById('drop');
+  const input = document.getElementById('fileInput');
+  const filenameEl = document.getElementById('filename');
+  const nextBtn = document.getElementById('nextBtn');
+
+  function handleFile(file){
+    if(!file) return;
+    filenameEl.textContent = "📄 " + file.name;
+    filenameEl.style.display = "block";
+    nextBtn.disabled = false;
+    nextBtn.classList.add('ready');
+  }
+  input.addEventListener('change', e => handleFile(e.target.files[0]));
+  ['dragover','dragenter'].forEach(evt=>{
+    drop.addEventListener(evt, e=>{ e.preventDefault(); drop.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(evt=>{
+    drop.addEventListener(evt, e=>{ e.preventDefault(); drop.classList.remove('drag'); });
+  });
+  drop.addEventListener('drop', e=>{
+    const file = e.dataTransfer.files[0];
+    if(file) handleFile(file);
+  });
+  nextBtn.addEventListener('click', ()=>{
+    if(!nextBtn.disabled) alert("Next slide is Step 3 of our roadmap 🙂");
+  });
+</script>
+
+</body>
+</html>
