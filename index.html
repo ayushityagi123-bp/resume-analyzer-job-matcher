@@ -51,6 +51,7 @@
     -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite:xor; mask-composite:exclude;
     opacity:0; transition:opacity .3s ease;
+    pointer-events:none;
   }
   .drop:hover::before, .drop.drag::before{opacity:1; animation:sheen 4s linear infinite;}
   @keyframes sheen{0%{background-position:0% 50%;}100%{background-position:300% 50%;}}
@@ -218,8 +219,8 @@
     if(file) handleFile(file);
   });
   nextBtn.addEventListener('click', ()=>{
-    if(!nextBtn.disabled) alert("Next slide is Step 3 of our roadmap 🙂");
-  });
+    if(!nextBtn.disabled) window.location.href = "slide2.html";
+});
 </script>
 
 </body>
