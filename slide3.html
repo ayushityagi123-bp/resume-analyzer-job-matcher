@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resume Analysis</title>
+<style>
+  :root{
+    --bg:#0B0E17; --line:#252B3B; --text:#F1F3F9; --muted:#8B93A7;
+    --violet:#8B5CF6; --blue:#3B82F6; --teal:#14B8A6; --amber:#F59E0B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;
+    background:radial-gradient(circle at 75% 20%, #1B1440 0%, var(--bg) 55%);
+    color:var(--text);font-family:'Segoe UI', Arial, sans-serif;
+    display:flex;align-items:center;justify-content:center;padding:40px;
+  }
+  .wrap{width:100%;max-width:620px;}
+  .step{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  h1{font-size:26px;margin:0 0 6px;font-weight:800;}
+  h1 span{background:linear-gradient(90deg,var(--violet),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--muted);font-size:14.5px;margin:0 0 24px;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-height:400px;overflow-y:auto;padding-right:4px;}
+  @media (max-width:600px){.grid{grid-template-columns:1fr;}}
+
+  .section{
+    background:#12162399;border:1px solid var(--line);border-radius:14px;padding:18px;
+  }
+  .section-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .section-head .icon{
+    width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .section-head .icon svg{width:15px;height:15px;stroke:white;}
+  .section-head h3{margin:0;font-size:14px;}
+
+  .icon.skills{background:linear-gradient(135deg,var(--violet),var(--blue));}
+  .icon.edu{background:linear-gradient(135deg,var(--blue),var(--teal));}
+  .icon.exp{background:linear-gradient(135deg,var(--amber),#EF4444);}
+  .icon.proj{background:linear-gradient(135deg,var(--teal),var(--violet));}
+
+  .tags{display:flex;flex-wrap:wrap;gap:6px;}
+  .tag{
+    background:#1A2033;border:1px solid var(--line);color:#D8DCE8;
+    font-size:11.5px;padding:5px 10px;border-radius:20px;
+  }
+
+  .edu-item{font-size:12.5px;color:#C7CCDA;line-height:1.5;}
+  .edu-item b{color:var(--text);}
+
+  .exp-item{margin-bottom:8px;}
+  .exp-item:last-child{margin-bottom:0;}
+  .exp-item .role{font-size:12.5px;font-weight:700;}
+  .exp-item .meta{font-size:11.5px;color:var(--muted);}
+
+  .proj-item{margin-bottom:10px;font-size:12.5px;color:#C7CCDA;}
+  .proj-item:last-child{margin-bottom:0;}
+  .proj-item b{color:var(--text);display:block;margin-bottom:2px;}
+
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;}
+  button{
+    font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;
+    padding:11px 22px;cursor:pointer;border:1px solid transparent;transition:.15s ease;
+  }
+  .btn-back{background:transparent;color:var(--muted);border-color:var(--line);}
+  .btn-back:hover{background:#161B29;}
+  .btn-next{background:linear-gradient(90deg,var(--violet),var(--blue));color:white;box-shadow:0 8px 24px rgba(59,130,246,.3);}
+  .btn-next:hover{transform:translateY(-1px);}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="step">Step 3 of 6</div>
+  <h1>Resume <span>Analysis</span></h1>
+  <p class="sub">Key information extracted from your resume.</p>
+
+  <div class="grid">
+
+    <div class="section">
+      <div class="section-head">
+        <div class="icon edu">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        </div>
+        <h3>Education</h3>
+      </div>
+      <div class="edu-item" id="eduBox"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="icon skills">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+        </div>
+        <h3>Skills</h3>
+      </div>
+      <div class="tags" id="skillsBox"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="icon exp">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        </div>
+        <h3>Experience</h3>
+      </div>
+      <div id="expBox"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="icon proj">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        </div>
+        <h3>Projects</h3>
+      </div>
+      <div id="projBox"></div>
+    </div>
+
+  </div>
+
+  <div class="nav-row">
+    <button class="btn-back" onclick="window.location.href='slide2.html'">← Back</button>
+    <button class="btn-next" onclick="window.location.href='slide4.html'">Next →</button>
+  </div>
+</div>
+
+<script>
+  // Placeholder — real data will come from backend parsing later
+  const data = {
+    education: [
+      "<b>B.Tech, Computer Science (Data Science)</b><br>Galgotias University · 2022–2026"
+    ],
+    skills: ["Python","SQL","Machine Learning","Pandas","NumPy","Git","Streamlit"],
+    experience: [
+      {role:"Data Analyst Intern", meta:"TCS iON · 2 months"},
+      {role:"Web Development Intern", meta:"Internshala · 1 month"}
+    ],
+    projects: [
+      {name:"Resume Analyzer & Job Matcher", desc:"ATS scoring + job matching web app"},
+      {name:"Sales Dashboard", desc:"Interactive analytics dashboard using Python"}
+    ]
+  };
+
+  document.getElementById('eduBox').innerHTML = data.education.join("<br><br>");
+
+  document.getElementById('skillsBox').innerHTML =
+    data.skills.map(s => `<span class="tag">${s}</span>`).join("");
+
+  document.getElementById('expBox').innerHTML =
+    data.experience.map(e => `
+      <div class="exp-item">
+        <div class="role">${e.role}</div>
+        <div class="meta">${e.meta}</div>
+      </div>`).join("");
+
+  document.getElementById('projBox').innerHTML =
+    data.projects.map(p => `
+      <div class="proj-item">
+        <b>${p.name}</b>${p.desc}
+      </div>`).join("");
+</script>
+
+</body>
+</html>

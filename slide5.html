@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Job Matches</title>
+<style>
+  :root{
+    --bg:#0B0E17; --line:#252B3B; --text:#F1F3F9; --muted:#8B93A7;
+    --violet:#8B5CF6; --blue:#3B82F6; --teal:#14B8A6; --amber:#F59E0B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;
+    background:radial-gradient(circle at 75% 20%, #1B1440 0%, var(--bg) 55%);
+    color:var(--text);font-family:'Segoe UI', Arial, sans-serif;
+    display:flex;align-items:center;justify-content:center;padding:40px;
+  }
+  .wrap{width:100%;max-width:600px;}
+  .step{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  h1{font-size:26px;margin:0 0 6px;font-weight:800;}
+  h1 span{background:linear-gradient(90deg,var(--violet),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--muted);font-size:14.5px;margin:0 0 22px;}
+
+  .list{display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;padding-right:4px;}
+
+  .job{
+    background:#12162399;border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px;display:flex;align-items:center;gap:14px;
+  }
+  .job-icon{
+    width:42px;height:42px;border-radius:10px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--violet),var(--blue));
+    display:flex;align-items:center;justify-content:center;
+  }
+  .job-icon svg{width:20px;height:20px;stroke:white;}
+  .job-info{flex:1;min-width:0;}
+  .job-title{font-size:14.5px;font-weight:700;margin:0 0 2px;}
+  .job-company{font-size:12px;color:var(--muted);}
+  .job-right{text-align:right;flex-shrink:0;}
+  .match{
+    font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;margin-bottom:8px;display:inline-block;
+  }
+  .match.high{background:#0F3D3A;color:var(--teal);}
+  .match.mid{background:#2A2A0F;color:var(--amber);}
+  .apply{
+    display:block;font-size:12px;font-weight:700;color:white;
+    background:linear-gradient(90deg,var(--violet),var(--blue));
+    padding:6px 12px;border-radius:8px;text-decoration:none;
+  }
+
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;}
+  button{
+    font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;
+    padding:11px 22px;cursor:pointer;border:1px solid transparent;transition:.15s ease;
+  }
+  .btn-back{background:transparent;color:var(--muted);border-color:var(--line);}
+  .btn-back:hover{background:#161B29;}
+  .btn-next{background:linear-gradient(90deg,var(--violet),var(--blue));color:white;box-shadow:0 8px 24px rgba(59,130,246,.3);}
+  .btn-next:hover{transform:translateY(-1px);}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="step">Step 5 of 6</div>
+  <h1>Job <span>Matches</span> For You</h1>
+  <p class="sub">Top job opportunities based on your profile.</p>
+
+  <div class="list" id="jobList"></div>
+
+  <div class="nav-row">
+    <button class="btn-back" onclick="window.location.href='slide4.html'">← Back</button>
+    <button class="btn-next" onclick="window.location.href='slide6.html'">Next →</button>
+  </div>
+</div>
+
+<script>
+  // Placeholder — real matches will come from backend job-matching logic later
+  const jobs = [
+    {title:"Data Analyst Intern", company:"TCS iON", match:90, link:"https://www.tcsion.com/careers"},
+    {title:"Junior Data Scientist", company:"Great Learning", match:85, link:"https://www.mygreatlearning.com/jobs"},
+    {title:"Data Science Intern", company:"Internshala", match:80, link:"https://internshala.com/jobs"},
+    {title:"SQL Developer Intern", company:"TalentSprint", match:75, link:"https://www.talentsprint.com/jobs"}
+  ];
+
+  document.getElementById('jobList').innerHTML = jobs.map(j => `
+    <div class="job">
+      <div class="job-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      </div>
+      <div class="job-info">
+        <div class="job-title">${j.title}</div>
+        <div class="job-company">${j.company}</div>
+      </div>
+      <div class="job-right">
+        <div class="match ${j.match>=85?'high':'mid'}">${j.match}% Match</div>
+        <a class="apply" href="${j.link}" target="_blank">Apply Now →</a>
+      </div>
+    </div>
+  `).join("");
+</script>
+
+</body>
+</html>
