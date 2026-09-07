@@ -21,7 +21,7 @@
   h1 span{background:linear-gradient(90deg,var(--violet),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent;}
   .sub{color:var(--muted);font-size:14.5px;margin:0 0 22px;}
 
-  .list{display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;padding-right:4px;}
+  .list{display:flex;flex-direction:column;gap:12px;max-height:420px;overflow-y:auto;padding-right:4px;}
 
   .job{
     background:#12162399;border:1px solid var(--line);border-radius:14px;
@@ -34,21 +34,30 @@
   }
   .job-icon svg{width:20px;height:20px;stroke:white;}
   .job-info{flex:1;min-width:0;}
-  .job-title{font-size:14.5px;font-weight:700;margin:0 0 2px;}
-  .job-company{font-size:12px;color:var(--muted);}
+  .job-title{font-size:14px;font-weight:700;margin:0 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .job-company{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .job-right{text-align:right;flex-shrink:0;}
   .match{
-    font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;margin-bottom:8px;display:inline-block;
+    font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin-bottom:8px;display:inline-block;
   }
   .match.high{background:#0F3D3A;color:var(--teal);}
   .match.mid{background:#2A2A0F;color:var(--amber);}
   .apply{
-    display:block;font-size:12px;font-weight:700;color:white;
+    display:block;font-size:11.5px;font-weight:700;color:white;
     background:linear-gradient(90deg,var(--violet),var(--blue));
     padding:6px 12px;border-radius:8px;text-decoration:none;
   }
 
-  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;}
+  .state-box{
+    text-align:center;padding:50px 20px;color:var(--muted);font-size:13px;
+  }
+  .spinner{
+    width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--violet);
+    border-radius:50%;margin:0 auto 14px;animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
   button{
     font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;
     padding:11px 22px;cursor:pointer;border:1px solid transparent;transition:.15s ease;
@@ -64,9 +73,14 @@
 <div class="wrap">
   <div class="step">Step 5 of 6</div>
   <h1>Job <span>Matches</span> For You</h1>
-  <p class="sub">Top job opportunities based on your profile.</p>
+  <p class="sub" id="subText">Top job opportunities based on your profile.</p>
 
-  <div class="list" id="jobList"></div>
+  <div class="list" id="jobList">
+    <div class="state-box">
+      <div class="spinner"></div>
+      Fetching live job listings...
+    </div>
+  </div>
 
   <div class="nav-row">
     <button class="btn-back" onclick="window.location.href='slide4.html'">← Back</button>
@@ -75,29 +89,59 @@
 </div>
 
 <script>
-  // Placeholder — real matches will come from backend job-matching logic later
-  const jobs = [
-    {title:"Data Analyst Intern", company:"TCS iON", match:90, link:"https://www.tcsion.com/careers"},
-    {title:"Junior Data Scientist", company:"Great Learning", match:85, link:"https://www.mygreatlearning.com/jobs"},
-    {title:"Data Science Intern", company:"Internshala", match:80, link:"https://internshala.com/jobs"},
-    {title:"SQL Developer Intern", company:"TalentSprint", match:75, link:"https://www.talentsprint.com/jobs"}
-  ];
+  const BACKEND_URL = "http://127.0.0.1:8000";
+  const stored = sessionStorage.getItem("resumeData");
 
-  document.getElementById('jobList').innerHTML = jobs.map(j => `
-    <div class="job">
-      <div class="job-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-      </div>
-      <div class="job-info">
-        <div class="job-title">${j.title}</div>
-        <div class="job-company">${j.company}</div>
-      </div>
-      <div class="job-right">
-        <div class="match ${j.match>=85?'high':'mid'}">${j.match}% Match</div>
-        <a class="apply" href="${j.link}" target="_blank">Apply Now →</a>
-      </div>
-    </div>
-  `).join("");
+  if(!stored){
+    window.location.href = "index.html";
+  } else {
+    const data = JSON.parse(stored);
+    const skills = data.skills || [];
+    const jobList = document.getElementById('jobList');
+
+    if(skills.length === 0){
+      jobList.innerHTML = `<div class="state-box">No skills were detected in your resume, so we couldn't search for matching jobs.</div>`;
+    } else {
+      fetch(BACKEND_URL + "/job-matches?skills=" + encodeURIComponent(skills.join(",")))
+        .then(res => res.json().then(body => ({ ok: res.ok, body })))
+        .then(({ ok, body }) => {
+          if(!ok){
+            jobList.innerHTML = `<div class="state-box">⚠ ${body.detail || "Could not fetch job listings."}</div>`;
+            return;
+          }
+
+          const jobs = body.jobs || [];
+          sessionStorage.setItem("jobMatches", JSON.stringify(jobs));
+
+          document.getElementById('subText').textContent =
+            `Found ${body.total_found} live openings — showing your top ${jobs.length} matches.`;
+
+          if(jobs.length === 0){
+            jobList.innerHTML = `<div class="state-box">No matching jobs found right now. Try again later.</div>`;
+            return;
+          }
+
+          jobList.innerHTML = jobs.map(j => `
+            <div class="job">
+              <div class="job-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+              </div>
+              <div class="job-info">
+                <div class="job-title">${j.title}</div>
+                <div class="job-company">${j.company} · ${j.location}</div>
+              </div>
+              <div class="job-right">
+                <div class="match ${j.match>=80?'high':'mid'}">${j.match}% Match</div>
+                <a class="apply" href="${j.link}" target="_blank" rel="noopener">Apply Now →</a>
+              </div>
+            </div>
+          `).join("");
+        })
+        .catch(() => {
+          jobList.innerHTML = `<div class="state-box">⚠ Could not connect to the server. Make sure the backend is running.</div>`;
+        });
+    }
+  }
 </script>
 
 </body>

@@ -19,38 +19,32 @@
   .step{font-size:12px;color:var(--muted);margin-bottom:8px;}
   h1{font-size:26px;margin:0 0 6px;font-weight:800;}
   h1 span{background:linear-gradient(90deg,var(--violet),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent;}
-  .sub{color:var(--muted);font-size:14.5px;margin:0 0 24px;}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 22px;line-height:1.5;}
 
-  .card{
-    background:#12162399;border:1px solid var(--line);border-radius:16px;padding:28px;
-  }
+  .card{background:#12162399;border:1px solid var(--line);border-radius:16px;padding:28px;}
 
-  .gauge-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:22px;}
-  .gauge{position:relative;width:180px;height:180px;}
+  .score-row{display:flex;align-items:center;gap:22px;padding-bottom:22px;border-bottom:1px solid var(--line);margin-bottom:22px;flex-wrap:wrap;}
+  .gauge{position:relative;width:120px;height:120px;flex-shrink:0;}
   .gauge svg{transform:rotate(-90deg);}
-  .gauge-bg{fill:none;stroke:#1C2333;stroke-width:14;}
-  .gauge-fill{
-    fill:none;stroke-width:14;stroke-linecap:round;
-    stroke:url(#gaugeGrad);
-    transition:stroke-dashoffset 1.2s ease;
-  }
-  .gauge-center{
-    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  }
-  .gauge-num{font-size:34px;font-weight:800;}
-  .gauge-label{font-size:11px;color:var(--muted);}
-  .verdict{margin-top:10px;font-size:14px;font-weight:700;color:var(--teal);}
-  .verdict-sub{font-size:12.5px;color:var(--muted);text-align:center;max-width:320px;}
+  .gauge-bg{fill:none;stroke:#1C2333;stroke-width:11;}
+  .gauge-fill{fill:none;stroke-width:11;stroke-linecap:round;stroke:url(#gaugeGrad);transition:stroke-dashoffset 1.2s ease;}
+  .gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .gauge-num{font-size:24px;font-weight:800;}
+  .gauge-sub{font-size:9px;color:var(--muted);letter-spacing:.5px;}
+  .verdict-title{font-size:16px;font-weight:700;margin-bottom:4px;}
+  .verdict-desc{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:280px;}
 
-  .breakdown{margin-top:18px;border-top:1px solid var(--line);padding-top:18px;}
-  .row{margin-bottom:12px;}
-  .row:last-child{margin-bottom:0;}
-  .row-label{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;}
-  .row-label span:last-child{color:var(--muted);}
-  .bar-bg{background:#1C2333;height:6px;border-radius:4px;overflow:hidden;}
-  .bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--violet),var(--blue));width:0%;transition:width 1s ease;}
+  .section-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px;}
 
-  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;}
+  .cat-row{margin-bottom:14px;}
+  .cat-row:last-child{margin-bottom:0;}
+  .cat-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;}
+  .cat-top .name{font-weight:600;}
+  .cat-top .score{color:var(--muted);}
+  .cat-bar-bg{background:#1C2333;height:5px;border-radius:4px;overflow:hidden;}
+  .cat-bar-fill{height:100%;border-radius:4px;width:0%;transition:width 1s ease;background:linear-gradient(90deg,var(--violet),var(--blue));}
+
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
   button{
     font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;
     padding:11px 22px;cursor:pointer;border:1px solid transparent;transition:.15s ease;
@@ -65,33 +59,35 @@
 
 <div class="wrap">
   <div class="step">Step 4 of 6</div>
-  <h1>ATS <span>Score</span></h1>
-  <p class="sub">Your resume performance against Applicant Tracking Systems.</p>
+  <h1>ATS <span>Compatibility Score</span></h1>
+  <p class="sub">Estimates how well your resume matches common ATS parsing standards.</p>
 
   <div class="card">
-    <div class="gauge-wrap">
+    <div class="score-row">
       <div class="gauge">
-        <svg width="180" height="180" viewBox="0 0 180 180">
+        <svg width="120" height="120" viewBox="0 0 120 120">
           <defs>
             <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stop-color="#8B5CF6"/>
               <stop offset="100%" stop-color="#14B8A6"/>
             </linearGradient>
           </defs>
-          <circle class="gauge-bg" cx="90" cy="90" r="78"/>
-          <circle class="gauge-fill" id="gaugeFill" cx="90" cy="90" r="78"
-            stroke-dasharray="490" stroke-dashoffset="490"/>
+          <circle class="gauge-bg" cx="60" cy="60" r="51"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="60" cy="60" r="51" stroke-dasharray="320" stroke-dashoffset="320"/>
         </svg>
         <div class="gauge-center">
-          <div class="gauge-num" id="scoreNum">0%</div>
-          <div class="gauge-label">ATS SCORE</div>
+          <div class="gauge-num" id="scoreNum">0</div>
+          <div class="gauge-sub">OUT OF 100</div>
         </div>
       </div>
-      <div class="verdict" id="verdictText"></div>
-      <div class="verdict-sub">Your resume is well optimized for Applicant Tracking Systems.</div>
+      <div>
+        <div class="verdict-title" id="verdictTitle"></div>
+        <div class="verdict-desc" id="verdictDesc"></div>
+      </div>
     </div>
 
-    <div class="breakdown" id="breakdown"></div>
+    <div class="section-label">Score Breakdown</div>
+    <div id="breakdownList"></div>
   </div>
 
   <div class="nav-row">
@@ -101,39 +97,40 @@
 </div>
 
 <script>
-  // Placeholder — real score will come from backend logic later
-  const score = 78;
-  const breakdown = [
-    {label:"Content Quality", value:85},
-    {label:"Skills Match", value:75},
-    {label:"Keyword Usage", value:80},
-    {label:"Formatting", value:70}
-  ];
+  const stored = sessionStorage.getItem("resumeData");
 
-  const circumference = 2 * Math.PI * 78;
-  const fill = document.getElementById('gaugeFill');
-  const offset = circumference - (score/100)*circumference;
+  if(!stored){
+    window.location.href = "index.html";
+  } else {
+    const data = JSON.parse(stored);
+    const score = data.ats_score;
+    const breakdown = data.ats_breakdown || [];
 
-  document.getElementById('scoreNum').textContent = score + "%";
-  document.getElementById('verdictText').textContent =
-    score >= 80 ? "Excellent Score! 🎯" :
-    score >= 60 ? "Good Score! 👍" : "Needs Improvement";
+    const circumference = 2 * Math.PI * 51;
+    const fill = document.getElementById('gaugeFill');
+    const offset = circumference - (score/100)*circumference;
 
-  const bdBox = document.getElementById('breakdown');
-  bdBox.innerHTML = breakdown.map(b => `
-    <div class="row">
-      <div class="row-label"><span>${b.label}</span><span>${b.value}%</span></div>
-      <div class="bar-bg"><div class="bar-fill" data-w="${b.value}"></div></div>
-    </div>
-  `).join("");
+    document.getElementById('scoreNum').textContent = score;
+    document.getElementById('verdictTitle').textContent = data.ats_verdict;
+    document.getElementById('verdictDesc').textContent = data.ats_verdict_desc || "";
 
-  // animate after paint
-  setTimeout(()=>{
-    fill.style.strokeDashoffset = offset;
-    document.querySelectorAll('.bar-fill').forEach(b=>{
-      b.style.width = b.dataset.w + "%";
-    });
-  }, 100);
+    document.getElementById('breakdownList').innerHTML = breakdown.map(b => {
+      const max = b.max || 100;
+      const pct = (b.value / max) * 100;
+      return `
+        <div class="cat-row">
+          <div class="cat-top"><span class="name">${b.label}</span><span class="score">${b.value}/${max}</span></div>
+          <div class="cat-bar-bg"><div class="cat-bar-fill" data-w="${pct}"></div></div>
+        </div>`;
+    }).join("");
+
+    setTimeout(()=>{
+      fill.style.strokeDashoffset = offset;
+      document.querySelectorAll('.cat-bar-fill').forEach(b=>{
+        b.style.width = b.dataset.w + "%";
+      });
+    }, 100);
+  }
 </script>
 
 </body>
