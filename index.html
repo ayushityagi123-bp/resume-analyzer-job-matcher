@@ -200,13 +200,57 @@
   const filenameEl = document.getElementById('filename');
   const nextBtn = document.getElementById('nextBtn');
 
-  function handleFile(file){
-    if(!file) return;
-    filenameEl.textContent = "📄 " + file.name;
+  const BACKEND_URL = "http://127.0.0.1:8000";
+
+  function showError(message){
+    filenameEl.style.color = "#EF4444";
+    filenameEl.textContent = "⚠ " + message;
     filenameEl.style.display = "block";
-    nextBtn.disabled = false;
-    nextBtn.classList.add('ready');
+    nextBtn.disabled = true;
+    nextBtn.classList.remove('ready');
   }
+
+  function showLoading(){
+    filenameEl.style.color = "#8B93A7";
+    filenameEl.textContent = "⏳ Uploading and reading your resume...";
+    filenameEl.style.display = "block";
+    nextBtn.disabled = true;
+    nextBtn.classList.remove('ready');
+  }
+
+  async function handleFile(file){
+    if(!file) return;
+    showLoading();
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(BACKEND_URL + "/upload-resume", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if(!response.ok){
+        showError(data.detail || "Something went wrong while reading your file.");
+        return;
+      }
+
+      sessionStorage.setItem("resumeData", JSON.stringify(data));
+
+      filenameEl.style.color = "#14B8A6";
+      filenameEl.textContent = "✅ " + data.filename + " — " + data.pages + " page(s) read successfully";
+      filenameEl.style.display = "block";
+      nextBtn.disabled = false;
+      nextBtn.classList.add('ready');
+
+    } catch (err){
+      showError("Could not connect to the server. Make sure the backend is running.");
+    }
+  }
+
   input.addEventListener('change', e => handleFile(e.target.files[0]));
   ['dragover','dragenter'].forEach(evt=>{
     drop.addEventListener(evt, e=>{ e.preventDefault(); drop.classList.add('drag'); });
@@ -218,9 +262,10 @@
     const file = e.dataTransfer.files[0];
     if(file) handleFile(file);
   });
+
   nextBtn.addEventListener('click', ()=>{
     if(!nextBtn.disabled) window.location.href = "slide2.html";
-});
+  });
 </script>
 
 </body>

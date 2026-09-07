@@ -127,39 +127,48 @@
 </div>
 
 <script>
-  // Placeholder — real data will come from backend parsing later
-  const data = {
-    education: [
-      "<b>B.Tech, Computer Science (Data Science)</b><br>Galgotias University · 2022–2026"
-    ],
-    skills: ["Python","SQL","Machine Learning","Pandas","NumPy","Git","Streamlit"],
-    experience: [
-      {role:"Data Analyst Intern", meta:"TCS iON · 2 months"},
-      {role:"Web Development Intern", meta:"Internshala · 1 month"}
-    ],
-    projects: [
-      {name:"Resume Analyzer & Job Matcher", desc:"ATS scoring + job matching web app"},
-      {name:"Sales Dashboard", desc:"Interactive analytics dashboard using Python"}
-    ]
-  };
+  const stored = sessionStorage.getItem("resumeData");
 
-  document.getElementById('eduBox').innerHTML = data.education.join("<br><br>");
+  if(!stored){
+    window.location.href = "index.html";
+  } else {
+    const data = JSON.parse(stored);
 
-  document.getElementById('skillsBox').innerHTML =
-    data.skills.map(s => `<span class="tag">${s}</span>`).join("");
+    const eduBox = document.getElementById('eduBox');
+    if(data.education && data.education.length > 0){
+      eduBox.innerHTML = data.education.map(e => `<div>${e}</div>`).join("<br>");
+    } else {
+      eduBox.innerHTML = "<span style='color:#5B6478'>No education details detected.</span>";
+    }
 
-  document.getElementById('expBox').innerHTML =
-    data.experience.map(e => `
-      <div class="exp-item">
-        <div class="role">${e.role}</div>
-        <div class="meta">${e.meta}</div>
-      </div>`).join("");
+    const skillsBox = document.getElementById('skillsBox');
+    if(data.skills && data.skills.length > 0){
+      skillsBox.innerHTML = data.skills.map(s => `<span class="tag">${s}</span>`).join("");
+    } else {
+      skillsBox.innerHTML = "<span style='color:#5B6478'>No known skills detected.</span>";
+    }
 
-  document.getElementById('projBox').innerHTML =
-    data.projects.map(p => `
-      <div class="proj-item">
-        <b>${p.name}</b>${p.desc}
-      </div>`).join("");
+    const expBox = document.getElementById('expBox');
+    if(data.experience && data.experience.length > 0){
+      expBox.innerHTML = data.experience.map(e => `
+        <div class="exp-item">
+          <div class="role">${e.role}</div>
+          <div class="meta">${e.meta || ""}</div>
+        </div>`).join("");
+    } else {
+      expBox.innerHTML = "<span style='color:#5B6478'>No experience detected.</span>";
+    }
+
+    const projBox = document.getElementById('projBox');
+    if(data.projects && data.projects.length > 0){
+      projBox.innerHTML = data.projects.map(p => `
+        <div class="proj-item">
+          <b>${p.name}</b>${p.desc}
+        </div>`).join("");
+    } else {
+      projBox.innerHTML = "<span style='color:#5B6478'>No projects detected.</span>";
+    }
+  }
 </script>
 
 </body>

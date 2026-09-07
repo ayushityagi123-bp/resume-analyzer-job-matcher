@@ -90,20 +90,30 @@
 </div>
 
 <script>
-  // Placeholder — real values will come from backend parsing later.
-  const resume = {
-    name: "Ayushi Tyagi",
-    contact: "Ghaziabad, UP · +91 9625470339 · ayushityagi165@gmail.com",
-    preview: "B.Tech in Computer Science (Data Science), Galgotias University. Skills: Python, SQL, Machine Learning. Projects: Resume Analyzer, Sales Dashboard...",
-    file: "Ayushi_Resume.pdf",
-    pages: "1 page"
-  };
+  // Read the real data that index.html saved after a successful upload
+  const stored = sessionStorage.getItem("resumeData");
 
-  document.getElementById('pName').textContent = resume.name;
-  document.getElementById('pContact').textContent = resume.contact;
-  document.getElementById('pPreview').textContent = resume.preview;
-  document.getElementById('pFile').textContent = resume.file;
-  document.getElementById('pPages').textContent = resume.pages;
+  if(!stored){
+    // No resume was uploaded — send the user back to slide 1
+    window.location.href = "index.html";
+  } else {
+    const data = JSON.parse(stored);
+    const text = data.extracted_text || "";
+
+    const firstLine = text.split("\n").find(l => l.trim().length > 0) || "Resume";
+    const emailMatch = text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    const phoneMatch = text.match(/\+?\d[\d\s-]{8,}\d/);
+
+    const contactParts = [];
+    if(phoneMatch) contactParts.push(phoneMatch[0].trim());
+    if(emailMatch) contactParts.push(emailMatch[0]);
+
+    document.getElementById('pName').textContent = firstLine.trim();
+    document.getElementById('pContact').textContent = contactParts.join(" · ") || "Contact details not found";
+    document.getElementById('pPreview').textContent = text.slice(0, 220) + (text.length > 220 ? "..." : "");
+    document.getElementById('pFile').textContent = data.filename;
+    document.getElementById('pPages').textContent = data.pages + (data.pages === 1 ? " page" : " pages");
+  }
 </script>
 
 </body>
