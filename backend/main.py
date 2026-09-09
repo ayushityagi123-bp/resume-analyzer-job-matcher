@@ -463,37 +463,53 @@ def _fetch_adzuna(what_or_terms: str, use_location: bool = True) -> dict:
 
 
 @app.get("/job-matches")
-def get_job_matches(skills: str):
+def get_job_matches(skills: str, role: str = ""):
     """
-    Fetches real, live job listings from Adzuna based on the resume's skills.
-    'skills' is a comma-separated string, e.g. "Python,SQL,Machine Learning".
-
-    Runs SEVERAL smaller searches (different skill pairs) instead of one big
-    OR-search across all skills — a single combined search kept returning
-    the same one or two generic job titles over and over (e.g. every result
-    being "Data Scientist"). Splitting the query and then capping how many
-    times the same title can appear in the final list gives more variety.
+    Fetches real, live job listings from Adzuna based on the resume's skills
+    AND a guessed target role (from the most recent experience title).
+    'skills' is comma-separated, e.g. "Python,SQL,Machine Learning".
+    'role' is a free-text guess like "Data Analyst" — used to make sure the
+    person's actual best-fit role shows up, not just any skill overlap.
     """
     skills_list = [s.strip() for s in skills.split(",") if s.strip()]
     if not skills_list:
         raise HTTPException(status_code=400, detail="No skills provided to search jobs for.")
 
     top_skills = skills_list[:8]
-    # Split into small groups so each search is targeted at a different angle
-    # of the resume, rather than one giant OR-query dominated by common terms.
     skill_groups = [top_skills[i:i + 2] for i in range(0, len(top_skills), 2)] or [top_skills]
 
     all_results = []
     seen_job_keys = set()
     total_found_estimate = 0
 
+    # ---- Search 1: the guessed target role itself (title-focused) ----
+    # This is what guarantees a role like "Data Analyst" shows up when the
+    # resume's own experience says "Data Analyst Intern", instead of only
+    # surfacing jobs that happen to share a skill keyword.
+    role_clean = re.sub(r'\b(intern|trainee|fresher|associate)\b', '', role, flags=re.IGNORECASE).strip()
+    if role_clean:
+        try:
+            data = _fetch_adzuna(role_clean, use_location=True)
+            role_results = data.get("results", [])
+            if len(role_results) < 3:
+                data = _fetch_adzuna(role_clean, use_location=False)
+                role_results = data.get("results", [])
+            total_found_estimate = max(total_found_estimate, data.get("count", 0))
+            for job in role_results:
+                key = job.get("id") or job.get("redirect_url")
+                if key and key not in seen_job_keys:
+                    seen_job_keys.add(key)
+                    all_results.append(job)
+        except requests.exceptions.RequestException:
+            pass
+
+    # ---- Search 2+: skill-pair groups (adds variety/breadth) ----
     for group in skill_groups:
         query = " ".join(group)
         try:
             data = _fetch_adzuna(query, use_location=True)
             group_results = data.get("results", [])
             if len(group_results) < 3:
-                # broaden if the location filter was too narrow for this group
                 data = _fetch_adzuna(query, use_location=False)
                 group_results = data.get("results", [])
             total_found_estimate = max(total_found_estimate, data.get("count", 0))
@@ -510,6 +526,7 @@ def get_job_matches(skills: str):
         return {"jobs": [], "total_found": 0, "missing_skills": []}
 
     skills_lower = [s.lower() for s in skills_list]
+    role_words = [w for w in re.findall(r'\w+', role_clean.lower()) if len(w) > 2]
     jobs = []
 
     for job in all_results:
@@ -524,12 +541,20 @@ def get_job_matches(skills: str):
 
         combined_text = (title + " " + description).lower()
         matched_skills = sum(1 for s in skills_lower if s in combined_text)
-        # Scale by what fraction of the resume's skills this job actually
-        # mentions — avoids every job clustering at the same capped score
-        # when the resume has many skills.
-        coverage_ratio = matched_skills / len(skills_lower) if skills_lower else 0
-        match_pct = round(55 + coverage_ratio * 40)
-        match_pct = min(match_pct, 96)
+
+        # Cap the denominator so someone with many skills isn't unfairly
+        # diluted — matching most of your CORE skills should still score high.
+        effective_total = min(len(skills_lower), 8) if skills_lower else 1
+        coverage_ratio = min(matched_skills / effective_total, 1)
+
+        # Bonus if the job title itself reflects the person's actual target
+        # role (e.g. resume says "Data Analyst" and title contains it too).
+        title_lower = title.lower()
+        role_hits = sum(1 for w in role_words if w in title_lower)
+        title_bonus = min(role_hits * 10, 20)
+
+        match_pct = round(55 + coverage_ratio * 25 + title_bonus)
+        match_pct = min(match_pct, 97)
 
         jobs.append({
             "title": title,
