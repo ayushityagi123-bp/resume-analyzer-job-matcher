@@ -38,7 +38,14 @@ SKILLS_DB = [
     "Git", "GitHub", "Docker", "Kubernetes", "AWS", "Azure", "GCP",
     "Linux", "REST API", "NLP", "Computer Vision", "OpenCV", "Statistics",
     "Probability", "ETL", "Spark", "Hadoop", "Firebase", "Figma",
-    "Java Script", "Bootstrap", "Tailwind", "PHP", "C#", ".NET",
+    "Bootstrap", "Tailwind", "PHP", "C#", ".NET",
+    # CS fundamentals / commonly listed on student resumes
+    "Data Structures", "Algorithms", "DSA", "OOP", "Object Oriented Programming",
+    "DBMS", "Operating Systems", "Computer Networks", "System Design",
+    "Kotlin", "Swift", "Go", "Rust", "Ruby", "Redux", "Next.js", "GraphQL",
+    "Jira", "Postman", "VS Code", "Shell Scripting", "Bash", "Jupyter",
+    "LangChain", "OpenAI API", "Hugging Face", "Selenium", "JUnit",
+    "CI/CD", "Agile", "Scrum", "Web Scraping", "Data Cleaning", "A/B Testing",
 ]
 
 EDUCATION_KEYWORDS = [
@@ -48,11 +55,37 @@ EDUCATION_KEYWORDS = [
 ]
 
 SECTION_HEADERS = {
-    "EDUCATION": ["EDUCATION", "ACADEMIC BACKGROUND", "QUALIFICATION"],
-    "SKILLS": ["SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE SKILLS"],
-    "EXPERIENCE": ["EXPERIENCE", "WORK EXPERIENCE", "INTERNSHIP", "INTERNSHIPS", "PROFESSIONAL EXPERIENCE"],
-    "PROJECTS": ["PROJECTS", "ACADEMIC PROJECTS", "PERSONAL PROJECTS"],
+    "EDUCATION": ["EDUCATION", "ACADEMIC BACKGROUND", "ACADEMIC QUALIFICATION", "QUALIFICATION"],
+    "SKILLS": ["SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE SKILLS", "SKILL SET",
+               "TECHNOLOGIES", "TECHNOLOGY", "TECH STACK", "TOOLS AND TECHNOLOGIES",
+               "TOOLS & TECHNOLOGIES", "LANGUAGES AND TOOLS", "LANGUAGES & TOOLS",
+               "TECHNICAL PROFICIENCY", "AREAS OF EXPERTISE"],
+    "EXPERIENCE": ["EXPERIENCE", "WORK EXPERIENCE", "INTERNSHIP", "INTERNSHIPS",
+                   "PROFESSIONAL EXPERIENCE", "WORK HISTORY", "EMPLOYMENT HISTORY"],
+    "PROJECTS": ["PROJECTS", "TECHNICAL PROJECTS", "ACADEMIC PROJECTS", "PERSONAL PROJECTS",
+                 "KEY PROJECTS", "MAJOR PROJECTS", "PROJECT EXPERIENCE"],
+    "SUMMARY": ["SUMMARY", "PROFESSIONAL SUMMARY", "CAREER OBJECTIVE", "OBJECTIVE", "PROFILE"],
 }
+
+
+def normalize_extracted_text(text: str) -> str:
+    """
+    Fixes common PDF-extraction artifacts where PDF font kerning causes
+    words to split apart with an extra space (e.g. "Java Script" instead
+    of "JavaScript"). Without this, skill detection can misfire — treating
+    "Java" as a separate skill when the resume only ever said "JavaScript".
+    """
+    fixes = [
+        (r'\bJava\s+Script\b', 'JavaScript'),
+        (r'\bType\s+Script\b', 'TypeScript'),
+        (r'\bNode\s*\.\s*js\b', 'Node.js'),
+        (r'\bScikit\s*-?\s*learn\b', 'Scikit-learn'),
+        (r'\bPower\s+BI\b', 'Power BI'),
+        (r'\bC\s*\+\s*\+', 'C++'),
+    ]
+    for pattern, replacement in fixes:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text
 
 
 def split_into_sections(text: str) -> dict:
@@ -69,14 +102,18 @@ def split_into_sections(text: str) -> dict:
 
         upper = line.upper()
         matched = None
+        best_kw_len = 0
+
         for section_name, keywords in SECTION_HEADERS.items():
             for kw in keywords:
-                # A line counts as a header if it's short and mostly just the keyword
-                if upper.startswith(kw) and len(line) <= len(kw) + 15:
-                    matched = section_name
-                    break
-            if matched:
-                break
+                # A line counts as a header if the keyword appears in it and
+                # the line itself is short (i.e. it's a heading, not a sentence
+                # that happens to mention the word). Prefer the longest keyword
+                # match so "TECHNICAL PROJECTS" wins over a bare "PROJECTS".
+                if kw in upper and len(line) <= len(kw) + 20:
+                    if len(kw) > best_kw_len:
+                        matched = section_name
+                        best_kw_len = len(kw)
 
         if matched:
             current = matched
@@ -86,12 +123,22 @@ def split_into_sections(text: str) -> dict:
     return sections
 
 
-def extract_skills(text: str) -> list:
-    text_lower = text.lower()
+def extract_skills(full_text: str, skills_section_text: str = "") -> list:
+    """
+    Searches for known skills in the resume.
+    Short, ambiguous names (like "R" or "C") are only matched inside the
+    dedicated Skills section — searching the whole document for a single
+    letter causes false positives (e.g. "R" matching inside "R&D").
+    Longer, unambiguous skill names are searched across the full text.
+    """
+    full_lower = full_text.lower()
+    skills_lower = skills_section_text.lower()
+
     found = []
     for skill in SKILLS_DB:
         pattern = r'\b' + re.escape(skill.lower()) + r'\b'
-        if re.search(pattern, text_lower):
+        search_space = skills_lower if len(skill) <= 2 else full_lower
+        if re.search(pattern, search_space):
             found.append(skill)
     return sorted(set(found))
 
@@ -137,31 +184,37 @@ def extract_experience(section_lines: list) -> list:
 
 
 def extract_projects(section_lines: list) -> list:
+    """
+    Groups project section lines into individual projects.
+    A new project is detected when a line ends with a year or date
+    (e.g. "...Engine 2026" or "Mar. 2026 – Present") — this is how
+    most resumes mark the start of a new project/role entry.
+    """
     results = []
-    current_title = None
-    current_desc = []
+    current = None
+    title_end_pattern = re.compile(
+        r'((?:Jan\.?|Feb\.?|Mar\.?|Apr\.?|May|Jun\.?|Jul\.?|Aug\.?|Sep\.?|Oct\.?|Nov\.?|Dec\.?)?\s*'
+        r'(19|20)\d{2}\s*(–|-|to)?\s*(present|(19|20)\d{2})?)\s*$', re.IGNORECASE
+    )
 
     for line in section_lines:
-        # Heuristic: short lines without periods are likely titles,
-        # longer lines are likely descriptions
-        if len(line) < 70 and not line.endswith("."):
-            if current_title:
-                results.append({
-                    "name": current_title,
-                    "desc": " ".join(current_desc)[:150]
-                })
-            current_title = line
-            current_desc = []
-        else:
-            current_desc.append(line)
+        looks_like_new_title = bool(title_end_pattern.search(line)) and len(line) < 110
 
-    if current_title:
-        results.append({
-            "name": current_title,
-            "desc": " ".join(current_desc)[:150]
-        })
+        if looks_like_new_title:
+            if current:
+                current["desc"] = current["desc"][:150]
+                results.append(current)
+            name = title_end_pattern.sub("", line).strip(" -–|:")
+            current = {"name": name or line, "desc": ""}
+        elif current:
+            current["desc"] += (" " if current["desc"] else "") + line
+        # lines before the first detected title are ignored (usually noise)
 
-    return results[:5]
+    if current:
+        current["desc"] = current["desc"][:150]
+        results.append(current)
+
+    return results[:6]
 
 
 @app.post("/upload-resume")
@@ -214,15 +267,18 @@ async def upload_resume(file: UploadFile = File(...)):
             detail="No readable text found in this PDF. It may be a scanned image — please upload a text-based PDF."
         )
 
+    full_text = normalize_extracted_text(full_text)
+
     # ---- Parse structured data from the extracted text ----
     sections = split_into_sections(full_text)
 
-    skills = extract_skills(full_text)
+    skills_section_text = "\n".join(sections["SKILLS"])
+    skills = extract_skills(full_text, skills_section_text)
     education = extract_education(sections["EDUCATION"] or sections["OTHER"])
     experience = extract_experience(sections["EXPERIENCE"])
     projects = extract_projects(sections["PROJECTS"])
 
-    ats_result = calculate_ats_score(full_text, skills, education, experience, projects)
+    ats_result = calculate_ats_score(full_text, skills, education, experience, projects, sections)
 
     return {
         "filename": filename,
@@ -242,13 +298,22 @@ async def upload_resume(file: UploadFile = File(...)):
     }
 
 
-def calculate_ats_score(text: str, skills: list, education: list, experience: list, projects: list) -> dict:
+def calculate_ats_score(text: str, skills: list, education: list, experience: list,
+                         projects: list, sections: dict) -> dict:
     """
     Rule-based ATS scoring — adapted from a standard 6-category weighted model
     (Keyword Strength, Skills Match, Experience Relevance, Education Match,
     ATS Formatting, Resume Completeness). No job description required —
     keyword scoring here measures general resume-language quality
     (action verbs + technical terms) instead of JD-specific keyword overlap.
+
+    This checks quantified-achievement DENSITY (what fraction of experience/
+    project bullets actually contain a measurable number) rather than just
+    "does a number appear anywhere" — real ATS/resume-checker tools
+    (Enhancv, Zety, Jobscan) flag exactly this ("Quantifying Impact") as a
+    common weak point, and a one-off number anywhere was scoring resumes
+    too generously.
+
     This is a heuristic estimate, not an official or universal ATS formula.
     """
     text_lower = text.lower()
@@ -256,7 +321,8 @@ def calculate_ats_score(text: str, skills: list, education: list, experience: li
 
     has_email = bool(re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', text))
     has_phone = bool(re.search(r'\+?\d[\d\s-]{8,}\d', text))
-    has_numbers = bool(re.search(r'\d+%|\d+\s*(percent|users|projects|hours|days|months|years)', text_lower))
+
+    number_pattern = re.compile(r'\d+(\.\d+)?\s*%|\d+\s*(percent|users|projects|hours|days|months|years|x\b)', re.IGNORECASE)
 
     action_verbs = ["developed", "built", "created", "designed", "managed", "led",
                      "implemented", "analyzed", "improved", "optimized", "achieved",
@@ -264,20 +330,28 @@ def calculate_ats_score(text: str, skills: list, education: list, experience: li
                      "engineered", "researched", "presented", "trained"]
     verbs_found = sum(1 for v in action_verbs if v in text_lower)
 
+    # ---- Quantified achievement DENSITY across experience + project bullets ----
+    bullet_lines = (sections.get("EXPERIENCE", []) or []) + (sections.get("PROJECTS", []) or [])
+    # Only count lines that look like actual bullet content, not short titles/dates
+    content_lines = [l for l in bullet_lines if len(l) > 25]
+    quantified_lines = [l for l in content_lines if number_pattern.search(l)]
+    quantified_ratio = (len(quantified_lines) / len(content_lines)) if content_lines else 0
+
+    has_summary = bool(sections.get("SUMMARY"))
+
     # ---- 1. Keyword Strength — out of 35 ----
-    # (Without a JD, we measure how strong/technical the resume's own language is:
-    # action verb usage + density of recognized technical/skill terms.)
-    verb_score = min(verbs_found / 8, 1) * 20
-    tech_density_score = min(len(skills) / 10, 1) * 15
-    keyword_score = round(verb_score + tech_density_score)
+    verb_score = min(verbs_found / 8, 1) * 15
+    tech_density_score = min(len(skills) / 10, 1) * 10
+    quantified_language_score = quantified_ratio * 10
+    keyword_score = round(verb_score + tech_density_score + quantified_language_score)
 
     # ---- 2. Skills Match — out of 25 ----
     skills_score = round(min(len(skills) / 10, 1) * 25)
 
     # ---- 3. Experience Relevance — out of 15 ----
-    exp_present = min(len(experience) / 2, 1) * 8
-    quantified_score = 7 if has_numbers else 0
-    experience_score = round(exp_present + quantified_score)
+    exp_present = 5 if (experience or projects) else 0
+    quantified_score = round(quantified_ratio * 10)
+    experience_score = exp_present + quantified_score
 
     # ---- 4. Education Match — out of 10 ----
     education_score = 10 if education else 0
@@ -285,7 +359,7 @@ def calculate_ats_score(text: str, skills: list, education: list, experience: li
     # ---- 5. ATS Formatting — out of 10 ----
     sections_present = sum([bool(education), bool(skills), bool(experience), bool(projects)])
     length_ok = 150 <= word_count <= 900
-    formatting_score = round((sections_present / 4) * 7 + (3 if length_ok else 1))
+    formatting_score = round((sections_present / 4) * 5 + (2 if length_ok else 0) + (3 if has_summary else 0))
     formatting_score = min(formatting_score, 10)
 
     # ---- 6. Resume Completeness — out of 5 ----
@@ -329,15 +403,22 @@ def calculate_ats_score(text: str, skills: list, education: list, experience: li
     else:
         needs_improvement.append("Education details not clearly detected")
 
-    if has_numbers:
-        passed.append("Quantified achievements found (numbers/percentages)")
+    if quantified_ratio >= 0.5:
+        passed.append("Most bullet points include measurable outcomes")
+    elif quantified_ratio > 0:
+        needs_improvement.append(f"Only {round(quantified_ratio*100)}% of your bullet points have measurable numbers — add metrics to more of them")
     else:
-        needs_improvement.append("Add measurable achievements (e.g. 'improved X by 20%')")
+        needs_improvement.append("Add measurable achievements to your bullets (e.g. 'improved accuracy by 20%')")
 
     if verbs_found >= 4:
         passed.append("Strong action verbs used")
     else:
         needs_improvement.append("Use more action verbs (developed, led, built, improved...)")
+
+    if has_summary:
+        passed.append("Professional summary/objective section found")
+    else:
+        needs_improvement.append("Add a short professional summary at the top framing your target role")
 
     tips = [
         "Use conventional section headings",
@@ -365,60 +446,73 @@ def calculate_ats_score(text: str, skills: list, education: list, experience: li
     }
 
 
+def _fetch_adzuna(what_or_terms: str, use_location: bool = True) -> dict:
+    url = "https://api.adzuna.com/v1/api/jobs/in/search/1"
+    params = {
+        "app_id": ADZUNA_APP_ID,
+        "app_key": ADZUNA_APP_KEY,
+        "results_per_page": 10,
+        "what_or": what_or_terms,
+        "content-type": "application/json"
+    }
+    if use_location:
+        params["where"] = "India"
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
 @app.get("/job-matches")
 def get_job_matches(skills: str):
     """
     Fetches real, live job listings from Adzuna based on the resume's skills.
     'skills' is a comma-separated string, e.g. "Python,SQL,Machine Learning".
+
+    Runs SEVERAL smaller searches (different skill pairs) instead of one big
+    OR-search across all skills — a single combined search kept returning
+    the same one or two generic job titles over and over (e.g. every result
+    being "Data Scientist"). Splitting the query and then capping how many
+    times the same title can appear in the final list gives more variety.
     """
     skills_list = [s.strip() for s in skills.split(",") if s.strip()]
     if not skills_list:
         raise HTTPException(status_code=400, detail="No skills provided to search jobs for.")
 
-    # Use OR-based matching (any of these skills can appear) instead of
-    # requiring ALL of them together — that was too restrictive and
-    # returned zero results for most skill combinations.
-    top_skills = skills_list[:6]
+    top_skills = skills_list[:8]
+    # Split into small groups so each search is targeted at a different angle
+    # of the resume, rather than one giant OR-query dominated by common terms.
+    skill_groups = [top_skills[i:i + 2] for i in range(0, len(top_skills), 2)] or [top_skills]
 
-    url = "https://api.adzuna.com/v1/api/jobs/in/search/1"
-    params = {
-        "app_id": ADZUNA_APP_ID,
-        "app_key": ADZUNA_APP_KEY,
-        "results_per_page": 20,
-        "what_or": " ".join(top_skills),
-        "where": "India",
-        "content-type": "application/json"
-    }
+    all_results = []
+    seen_job_keys = set()
+    total_found_estimate = 0
 
-    try:
-        r = requests.get(url, params=params, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Could not fetch live job listings: {str(e)}")
-
-    results = data.get("results", [])
-
-    # Fallback: if very few results with location filter, broaden the search
-    if len(results) < 5:
-        broader_params = dict(params)
-        broader_params.pop("where", None)
+    for group in skill_groups:
+        query = " ".join(group)
         try:
-            r2 = requests.get(url, params=broader_params, timeout=10)
-            r2.raise_for_status()
-            data2 = r2.json()
-            if len(data2.get("results", [])) > len(results):
-                data = data2
-                results = data.get("results", [])
+            data = _fetch_adzuna(query, use_location=True)
+            group_results = data.get("results", [])
+            if len(group_results) < 3:
+                # broaden if the location filter was too narrow for this group
+                data = _fetch_adzuna(query, use_location=False)
+                group_results = data.get("results", [])
+            total_found_estimate = max(total_found_estimate, data.get("count", 0))
         except requests.exceptions.RequestException:
-            pass  # keep whatever we already have
-    if not results:
-        return {"jobs": [], "total_found": 0}
+            continue
+
+        for job in group_results:
+            key = job.get("id") or job.get("redirect_url")
+            if key and key not in seen_job_keys:
+                seen_job_keys.add(key)
+                all_results.append(job)
+
+    if not all_results:
+        return {"jobs": [], "total_found": 0, "missing_skills": []}
 
     skills_lower = [s.lower() for s in skills_list]
     jobs = []
 
-    for job in results:
+    for job in all_results:
         title = job.get("title", "Untitled Role")
         company = (job.get("company") or {}).get("display_name", "Unknown Company")
         location = (job.get("location") or {}).get("display_name", "India")
@@ -426,28 +520,70 @@ def get_job_matches(skills: str):
         apply_link = job.get("redirect_url", "")
 
         if not apply_link:
-            continue  # skip any listing without a real, working apply link
+            continue
 
         combined_text = (title + " " + description).lower()
         matched_skills = sum(1 for s in skills_lower if s in combined_text)
-
-        # Base score reflects that the search query itself already filtered
-        # for relevance; extra matched skills push the score higher.
-        match_pct = min(60 + (matched_skills * 8), 97)
+        # Scale by what fraction of the resume's skills this job actually
+        # mentions — avoids every job clustering at the same capped score
+        # when the resume has many skills.
+        coverage_ratio = matched_skills / len(skills_lower) if skills_lower else 0
+        match_pct = round(55 + coverage_ratio * 40)
+        match_pct = min(match_pct, 96)
 
         jobs.append({
             "title": title,
             "company": company,
             "location": location,
             "match": match_pct,
-            "link": apply_link
+            "link": apply_link,
+            "_description": description
         })
 
     jobs.sort(key=lambda j: j["match"], reverse=True)
 
+    # ---- Diversify: round-robin across distinct job titles instead of ----
+    # ---- taking many of the same title back-to-back                  ----
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    title_order = []
+    for job in jobs:
+        norm_title = job["title"].strip().lower()
+        if norm_title not in grouped:
+            title_order.append(norm_title)
+        grouped[norm_title].append(job)
+
+    final_jobs = []
+    round_index = 0
+    while len(final_jobs) < 12 and any(round_index < len(grouped[t]) for t in title_order):
+        for t in title_order:
+            if round_index < len(grouped[t]):
+                final_jobs.append(grouped[t][round_index])
+                if len(final_jobs) >= 12:
+                    break
+        round_index += 1
+
+    # ---- Missing Skills: scan descriptions for skills not already known ----
+    all_job_text = " ".join(j["_description"] for j in final_jobs).lower()
+    skill_frequency = {}
+    for skill in SKILLS_DB:
+        if skill.lower() in skills_lower:
+            continue  # already have this skill — not "missing"
+        pattern = r'\b' + re.escape(skill.lower()) + r'\b'
+        count = len(re.findall(pattern, all_job_text))
+        if count > 0:
+            skill_frequency[skill] = count
+
+    missing_skills = sorted(skill_frequency, key=skill_frequency.get, reverse=True)[:6]
+
+    # Strip the internal description field before sending the response
+    for j in final_jobs:
+        j.pop("_description", None)
+
     return {
-        "jobs": jobs[:12],
-        "total_found": data.get("count", len(jobs))
+        "jobs": final_jobs,
+        "total_found": total_found_estimate,
+        "missing_skills": missing_skills
     }
 
 
