@@ -39,6 +39,7 @@
     background:#1A1508;border:1px solid #3A2E0D;border-radius:10px;
     padding:12px 14px;font-size:12.5px;color:#F0D89C;line-height:1.5;
   }
+  .empty-note{color:#5B6478;font-size:12.5px;}
 
   .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
   button{
@@ -56,7 +57,7 @@
 <div class="wrap">
   <div class="step">Step 6 of 6</div>
   <h1>Missing Skills & <span>Recommendations</span></h1>
-  <p class="sub">Improve your skills to get better opportunities.</p>
+  <p class="sub">Based on the live job listings we found for your profile.</p>
 
   <div class="card">
     <div class="card-head">
@@ -90,23 +91,33 @@
 
   <div class="nav-row">
     <button class="btn-back" onclick="window.location.href='slide5.html'">← Back</button>
-    <button class="btn-restart" onclick="window.location.href='index.html'">Start Over ↻</button>
+    <button class="btn-restart" onclick="sessionStorage.clear(); window.location.href='index.html'">Start Over ↻</button>
   </div>
 </div>
 
 <script>
-  // Placeholder — real gaps will come from backend job/skill comparison later
-  const missing = ["Power BI","Tableau","Excel (Advanced)","Statistics"];
-  const recommended = ["Learn Power BI for Data Visualization","Improve Excel skills","Explore Statistics & Probability"];
-  const tip = "Adding these skills to your resume can significantly improve your ATS score and job match percentage.";
+  const resumeStored = sessionStorage.getItem("resumeData");
+  const missingStored = sessionStorage.getItem("missingSkills");
 
-  document.getElementById('missingBox').innerHTML =
-    missing.map(s => `<span class="tag missing">✕ ${s}</span>`).join("");
+  if(!resumeStored){
+    window.location.href = "index.html";
+  } else {
+    const missing = missingStored ? JSON.parse(missingStored) : [];
 
-  document.getElementById('goodBox').innerHTML =
-    recommended.map(s => `<span class="tag good">${s}</span>`).join("");
+    const missingBox = document.getElementById('missingBox');
+    const goodBox = document.getElementById('goodBox');
+    const tipBox = document.getElementById('tipBox');
 
-  document.getElementById('tipBox').textContent = tip;
+    if(missing.length > 0){
+      missingBox.innerHTML = missing.map(s => `<span class="tag missing">✕ ${s}</span>`).join("");
+      goodBox.innerHTML = missing.slice(0, 4).map(s => `<span class="tag good">Learn ${s}</span>`).join("");
+      tipBox.textContent = "These skills appear frequently in job listings that match your profile. Adding them to your resume can improve your ATS score and job match percentage.";
+    } else {
+      missingBox.innerHTML = `<span class="empty-note">No major skill gaps found — nice work!</span>`;
+      goodBox.innerHTML = `<span class="empty-note">Your skillset already lines up well with matching roles.</span>`;
+      tipBox.textContent = "Keep your resume updated with your latest projects and achievements to stay competitive.";
+    }
+  }
 </script>
 
 </body>

@@ -4,6 +4,10 @@ import pdfplumber
 import io
 import re
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # reads variables from the .env file into the environment
 
 app = FastAPI()
 
@@ -20,8 +24,12 @@ MAX_FILE_SIZE_MB = 10
 # Adzuna API credentials (free tier). Get your own at:
 # https://developer.adzuna.com/
 # ---------------------------------------------------------------------
-ADZUNA_APP_ID = "dbca915e"
-ADZUNA_APP_KEY = "ce2d3986f6b4415f468328de2704a9b1"
+ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
+ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
+
+if not ADZUNA_APP_ID or not ADZUNA_APP_KEY:
+    print("WARNING: Adzuna API credentials not found. Make sure backend/.env "
+          "contains ADZUNA_APP_ID and ADZUNA_APP_KEY.")
 
 # ---------------------------------------------------------------------
 # A reasonably wide skills dictionary. This is a rule-based approach —

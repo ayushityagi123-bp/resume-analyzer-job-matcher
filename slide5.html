@@ -102,7 +102,11 @@
     if(skills.length === 0){
       jobList.innerHTML = `<div class="state-box">No skills were detected in your resume, so we couldn't search for matching jobs.</div>`;
     } else {
-      fetch(BACKEND_URL + "/job-matches?skills=" + encodeURIComponent(skills.join(",")))
+      const roleGuess = (data.experience && data.experience[0] && data.experience[0].role) || "";
+      const jobUrl = BACKEND_URL + "/job-matches?skills=" + encodeURIComponent(skills.join(","))
+                    + "&role=" + encodeURIComponent(roleGuess);
+
+      fetch(jobUrl)
         .then(res => res.json().then(body => ({ ok: res.ok, body })))
         .then(({ ok, body }) => {
           if(!ok){
@@ -112,6 +116,7 @@
 
           const jobs = body.jobs || [];
           sessionStorage.setItem("jobMatches", JSON.stringify(jobs));
+          sessionStorage.setItem("missingSkills", JSON.stringify(body.missing_skills || []));
 
           document.getElementById('subText').textContent =
             `Found ${body.total_found} live openings — showing your top ${jobs.length} matches.`;
