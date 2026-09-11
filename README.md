@@ -59,8 +59,8 @@ pip install fastapi uvicorn python-multipart pdfplumber requests python-dotenv
 Create a `.env` file inside `backend/` with your own free [Adzuna API](https://developer.adzuna.com/) credentials:
 
 ```
-ADZUNA_APP_ID=your_app_id_here
-ADZUNA_APP_KEY=your_app_key_here
+ADZUNA_APP_ID = "dbca915e"
+ADZUNA_APP_KEY = "ce2d3986f6b4415f468328de2704a9b1"
 ```
 
 Start the backend:
