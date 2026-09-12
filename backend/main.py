@@ -60,7 +60,19 @@ SKILLS_DB = [
 EDUCATION_KEYWORDS = [
     "B.Tech", "B Tech", "BTech", "Bachelor", "B.E", "BE ", "M.Tech", "MTech",
     "Master", "M.E", "MBA", "BCA", "MCA", "BSc", "MSc", "B.Sc", "M.Sc",
-    "Diploma", "Ph.D", "PhD", "Intermediate", "High School", "12th", "10th"
+    "Diploma", "Ph.D", "PhD", "Intermediate", "High School", "12th", "10th",
+    # Broader schooling/qualification wording (many Indian resumes use these
+    # instead of a degree name for 10th/12th entries)
+    "Senior Secondary", "Secondary", "CBSE", "ICSE", "SSC", "HSC",
+    "Matriculation", "State Board", "Class 10", "Class 12", "Class X", "Class XII",
+]
+
+# Institute-name signals — kept broad and regional (e.g. "Vidyalaya"/"Vidhyalaya"
+# for schools) so 10th/12th school entries are recognized just as reliably as
+# college/university entries, rather than relying only on a degree keyword.
+EDUCATION_INSTITUTE_KEYWORDS = [
+    "University", "College", "Institute", "School",
+    "Vidyalaya", "Vidhyalaya", "Academy", "Polytechnic",
 ]
 
 SECTION_HEADERS = {
@@ -136,6 +148,16 @@ def _best_section_match(line: str) -> str | None:
     using both containment and fuzzy similarity, so headers are detected
     regardless of exact wording, minor typos, or decorative formatting —
     not just the literal keyword list.
+
+    A containment match ("PROJECTS" found inside the line) is only trusted
+    when the keyword makes up MOST of the line — i.e. at most a couple of
+    extra words remain after removing it (covers cases like "TECHNICAL
+    PROJECTS" or "MY PROJECTS"). Without this guard, a keyword that happens
+    to appear inside unrelated text gets misread as a header — e.g. the
+    word "Technology" inside the institute name "XYZ Institute of
+    Technology" would otherwise be misdetected as a "SKILLS" section header
+    (since "TECHNOLOGY" is a Skills synonym), silently swallowing whatever
+    section came after it.
     """
     normalized = _normalize_header_line(line)
     upper = normalized.upper()
@@ -147,18 +169,23 @@ def _best_section_match(line: str) -> str | None:
 
     for section_name, keywords in SECTION_HEADERS.items():
         for kw in keywords:
+            score = 0.0
             if kw in upper:
-                # Containment match — prefer the longest keyword so
-                # "TECHNICAL PROJECTS" wins over a bare "PROJECTS".
-                score = 1.0 + (len(kw) / 100.0)
-            else:
+                remainder = upper.replace(kw, "", 1).split()
+                if len(remainder) <= 2:
+                    # Keyword makes up nearly the whole line — trustworthy header.
+                    score = 1.0 + (len(kw) / 100.0)
+                # else: keyword is just a fragment of a longer, unrelated
+                # line (e.g. an institute/company name) — don't trust it as
+                # containment; fall through to the fuzzy check below instead.
+            if score == 0.0:
                 score = difflib.SequenceMatcher(None, upper, kw).ratio()
 
             if score > best_score:
                 best_score = score
                 best_section = section_name
 
-    # 1.0+ = direct containment. Below that, require a close fuzzy match
+    # 1.0+ = trusted containment. Below that, require a close fuzzy match
     # (handles typos / near-variants) so we don't misfire on unrelated text.
     if best_score >= 0.78:
         return best_section
@@ -216,28 +243,55 @@ def extract_skills(full_text: str, skills_section_text: str = "") -> list:
 
 
 def extract_education(section_lines: list) -> list:
-    results = []
-    joined = " ".join(section_lines)
+    """
+    Groups education lines block-by-block, one block per institution —
+    rather than filtering lines independently — so a 10th/12th school entry
+    (which usually has no "degree" keyword, just "Senior Secondary"/CBSE
+    wording) is captured just as reliably as a B.Tech/university entry.
 
-    # Find degree mentions
-    degree_pattern = r'(' + '|'.join(re.escape(k) for k in EDUCATION_KEYWORDS) + r')[^,.\n]*'
-    matches = re.findall(degree_pattern, joined, flags=re.IGNORECASE)
+    A new block starts whenever a line names an institute (broad keyword
+    list covering schools, colleges, universities, regional naming like
+    "Vidyalaya"). Every institute name is treated as a new entry even if
+    the exact same school name repeats for both 10th and 12th, since it's
+    a genuinely separate qualification each time.
+    """
+    if not section_lines:
+        return []
+
+    def is_institute_line(line: str) -> bool:
+        return any(kw.lower() in line.lower() for kw in EDUCATION_INSTITUTE_KEYWORDS)
+
+    def is_relevant_detail(line: str) -> bool:
+        has_keyword = any(k.lower() in line.lower() for k in EDUCATION_KEYWORDS)
+        has_year = bool(re.search(r'\b(19|20)\d{2}\b', line))
+        has_score = bool(re.search(r'\bcgpa\b', line, re.IGNORECASE) or re.search(r'\d{1,3}(\.\d+)?\s*%', line))
+        return has_keyword or has_year or has_score
+
+    blocks = []
+    current = []
 
     for line in section_lines:
-        has_degree = any(k.lower() in line.lower() for k in EDUCATION_KEYWORDS)
-        has_institute = any(w in line for w in ["University", "College", "Institute", "School"])
-        if has_degree or has_institute:
-            results.append(line)
+        if is_institute_line(line):
+            if current:
+                blocks.append(current)
+            current = [line]
+        elif current:
+            if is_relevant_detail(line):
+                current.append(line)
+            # non-relevant lines inside a block (rare filler text) are skipped
+        elif is_relevant_detail(line):
+            # A degree/score line appearing with no institute line before it
+            blocks.append([line])
 
-    # De-duplicate while preserving order
-    seen = set()
-    unique = []
-    for r in results:
-        if r not in seen:
-            seen.add(r)
-            unique.append(r)
+    if current:
+        blocks.append(current)
 
-    return unique[:4]  # cap at 4 entries to avoid noise
+    # Each block becomes its own set of result lines (institute + its details)
+    results = []
+    for block in blocks:
+        results.extend(block)
+
+    return results[:9]  # allow room for multiple qualifications (10th/12th/degree)
 
 
 def extract_experience(section_lines: list) -> list:
@@ -301,7 +355,21 @@ def extract_projects(section_lines: list) -> list:
         has_bullet_signal = bool(_PROJECT_BULLET_PATTERN.match(line))
         has_title_shape = (not has_bullet_signal) and _is_probable_project_title(line) and len(line) < 110
 
-        starts_new_project = has_date_signal or has_bullet_signal or has_title_shape
+        # A title-shaped line only counts as the start of a NEW project if
+        # we're not still inside the "header block" (title + tech-stack
+        # subtitle) of the current one. Real resumes often list a tech-stack
+        # line right under the project title (e.g. "React, Node.js, Leaflet
+        # API") which is ALSO short and Title-Case — without this check it
+        # gets misread as its own project, leaving the real title with an
+        # empty description. So: if current has no description yet, treat
+        # this line as a continuation (subtitle/tech-stack), not a new item.
+        # Bullets and explicit dates are unambiguous, so they always split.
+        if has_date_signal or has_bullet_signal:
+            starts_new_project = True
+        elif has_title_shape:
+            starts_new_project = (current is None) or (current["desc"].strip() != "")
+        else:
+            starts_new_project = False
 
         if starts_new_project:
             if current:
