@@ -5,6 +5,7 @@ import io
 import re
 import requests
 import os
+import difflib
 from dotenv import load_dotenv
 
 load_dotenv()  # reads variables from the .env file into the environment
@@ -96,8 +97,82 @@ def normalize_extracted_text(text: str) -> str:
     return text
 
 
+def _normalize_header_line(line: str) -> str:
+    """
+    Strips decorative characters that resumes commonly wrap headers in
+    (e.g. "=== SKILLS ===", "** Projects **", "--- Education ---", ":"),
+    so the underlying keyword can be compared cleanly. This makes header
+    detection independent of *how* the heading is decorated/styled.
+    """
+    cleaned = re.sub(r'[=\-_*~#•·|>]+', ' ', line)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    return cleaned.strip()
+
+
+def _looks_like_header_shape(line: str) -> bool:
+    """
+    Structural check independent of any specific keyword or its length:
+    a section heading is short (a handful of words), doesn't end with a
+    sentence-ending period, and isn't a long descriptive sentence. This
+    replaces the old "line length <= keyword length + 20" rule, which
+    unfairly penalized short keywords like "SKILLS" while being lenient
+    for long ones — the shape check now applies the same way regardless
+    of which keyword eventually matches.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return False
+    word_count = len(stripped.split())
+    if word_count == 0 or word_count > 6:
+        return False
+    if stripped.endswith("."):
+        return False
+    return True
+
+
+def _best_section_match(line: str) -> str | None:
+    """
+    Matches a (already shape-checked) line against SECTION_HEADERS keywords
+    using both containment and fuzzy similarity, so headers are detected
+    regardless of exact wording, minor typos, or decorative formatting —
+    not just the literal keyword list.
+    """
+    normalized = _normalize_header_line(line)
+    upper = normalized.upper()
+    if not upper:
+        return None
+
+    best_section = None
+    best_score = 0.0
+
+    for section_name, keywords in SECTION_HEADERS.items():
+        for kw in keywords:
+            if kw in upper:
+                # Containment match — prefer the longest keyword so
+                # "TECHNICAL PROJECTS" wins over a bare "PROJECTS".
+                score = 1.0 + (len(kw) / 100.0)
+            else:
+                score = difflib.SequenceMatcher(None, upper, kw).ratio()
+
+            if score > best_score:
+                best_score = score
+                best_section = section_name
+
+    # 1.0+ = direct containment. Below that, require a close fuzzy match
+    # (handles typos / near-variants) so we don't misfire on unrelated text.
+    if best_score >= 0.78:
+        return best_section
+    return None
+
+
 def split_into_sections(text: str) -> dict:
-    """Splits resume text into sections based on common header keywords."""
+    """
+    Splits resume text into sections based on header keywords, wherever
+    in the document they appear and however they're worded or styled.
+    Detection is a two-step process: (1) does this line have the *shape*
+    of a heading (short, not a sentence)? (2) does it match — exactly,
+    by containment, or fuzzily — one of the known section keywords?
+    """
     lines = text.split("\n")
     sections = {key: [] for key in SECTION_HEADERS}
     sections["OTHER"] = []
@@ -108,20 +183,9 @@ def split_into_sections(text: str) -> dict:
         if not line:
             continue
 
-        upper = line.upper()
         matched = None
-        best_kw_len = 0
-
-        for section_name, keywords in SECTION_HEADERS.items():
-            for kw in keywords:
-                # A line counts as a header if the keyword appears in it and
-                # the line itself is short (i.e. it's a heading, not a sentence
-                # that happens to mention the word). Prefer the longest keyword
-                # match so "TECHNICAL PROJECTS" wins over a bare "PROJECTS".
-                if kw in upper and len(line) <= len(kw) + 20:
-                    if len(kw) > best_kw_len:
-                        matched = section_name
-                        best_kw_len = len(kw)
+        if _looks_like_header_shape(line):
+            matched = _best_section_match(line)
 
         if matched:
             current = matched
@@ -191,28 +255,61 @@ def extract_experience(section_lines: list) -> list:
     return results[:5]
 
 
+_PROJECT_DATE_PATTERN = re.compile(
+    r'((?:Jan\.?|Feb\.?|Mar\.?|Apr\.?|May|Jun\.?|Jul\.?|Aug\.?|Sep\.?|Oct\.?|Nov\.?|Dec\.?)?\s*'
+    r'(19|20)\d{2}\s*(–|-|to)?\s*(present|(19|20)\d{2})?)\s*$', re.IGNORECASE
+)
+_PROJECT_BULLET_PATTERN = re.compile(r'^\s*([•*\-–—▪●]|\d+[\.\)])\s+')
+
+
+def _is_probable_project_title(line: str) -> bool:
+    """
+    A project title line is short and mostly Capitalized/Title Case.
+    This is a *shape* signal, independent of whether a date is present —
+    so projects without any date still get split correctly.
+    """
+    words = line.split()
+    if not words or len(words) > 10:
+        return False
+    capitalized = sum(1 for w in words if w[:1].isupper())
+    return (capitalized / len(words)) >= 0.6
+
+
 def extract_projects(section_lines: list) -> list:
     """
-    Groups project section lines into individual projects.
-    A new project is detected when a line ends with a year or date
-    (e.g. "...Engine 2026" or "Mar. 2026 – Present") — this is how
-    most resumes mark the start of a new project/role entry.
+    Groups project section lines into individual projects using multiple
+    signals, not just a trailing year/date:
+      1. A bullet or numbered prefix ("•", "-", "1.") starts a new project.
+      2. A short, mostly Title-Case line starts a new project (works even
+         when there's no date at all).
+      3. A trailing year/date (e.g. "...Engine 2026", "Mar. 2026 – Present")
+         is still treated as a strong signal when present, and is stripped
+         from the stored title.
+    Any one of these firing is enough — the date is now a bonus signal,
+    not a requirement, so undated project titles are no longer merged
+    into the previous project's description.
     """
     results = []
     current = None
-    title_end_pattern = re.compile(
-        r'((?:Jan\.?|Feb\.?|Mar\.?|Apr\.?|May|Jun\.?|Jul\.?|Aug\.?|Sep\.?|Oct\.?|Nov\.?|Dec\.?)?\s*'
-        r'(19|20)\d{2}\s*(–|-|to)?\s*(present|(19|20)\d{2})?)\s*$', re.IGNORECASE
-    )
 
-    for line in section_lines:
-        looks_like_new_title = bool(title_end_pattern.search(line)) and len(line) < 110
+    for raw_line in section_lines:
+        line = raw_line.strip()
+        if not line:
+            continue
 
-        if looks_like_new_title:
+        has_date_signal = bool(_PROJECT_DATE_PATTERN.search(line)) and len(line) < 110
+        has_bullet_signal = bool(_PROJECT_BULLET_PATTERN.match(line))
+        has_title_shape = (not has_bullet_signal) and _is_probable_project_title(line) and len(line) < 110
+
+        starts_new_project = has_date_signal or has_bullet_signal or has_title_shape
+
+        if starts_new_project:
             if current:
                 current["desc"] = current["desc"][:150]
                 results.append(current)
-            name = title_end_pattern.sub("", line).strip(" -–|:")
+
+            name = _PROJECT_DATE_PATTERN.sub("", line).strip(" -–|:")
+            name = _PROJECT_BULLET_PATTERN.sub("", name).strip(" -–|:")
             current = {"name": name or line, "desc": ""}
         elif current:
             current["desc"] += (" " if current["desc"] else "") + line
